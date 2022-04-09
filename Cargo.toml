@@ -1,12 +1,15 @@
 [package]
-name = "MGet"
+name = "mget"
 version = "0.1.0"
 edition = "2021"
-
+repository = "https://github.com/tusik/MGet"
+authors = ["Image <image@by.cx>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+clap = { version = "3.1.8", features = ["derive"] }
 reqwest = { version = "0.11", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
 bytes = { version = "1", features = ["serde"] }
 futures = "0.3"
+url = "2.2.2"
