@@ -1,18 +1,26 @@
-use std::{sync::{Arc}, io::{SeekFrom, Read}};
+use std::{sync::Arc, io::{SeekFrom, Read, Error, self}};
 use bytes::Bytes;
 use reqwest::{Method, Url};
 use tokio::{fs::{File, OpenOptions}, io::{AsyncSeekExt, AsyncWriteExt}, sync::Mutex};
 use futures::{self, stream::FuturesUnordered, StreamExt};
 pub struct Downloader{
     file_name:String,
-    file: Arc<Mutex<File>>,
+    file: Option<Arc<Mutex<File>>>,
     url: String,
     batch_size : u64,
 }
+
+fn read_line() -> String{
+    let mut s = String::new();
+    io::stdin().read_line(&mut s).expect("Failed to parse int. Please only enter digits.");
+    s
+}
+
 impl Downloader {
+    
     pub async fn file(&mut self, file_path:String){
         self.file_name = file_path.clone();
-        self.file = Downloader::open_file(file_path.clone()).await;
+        self.file = Downloader::open_file(file_path.clone(),false).await.map_or(None, |v|Some(v))
     }
     pub fn batch_size(&mut self, batch_size:u64){
         self.batch_size = batch_size;
@@ -27,7 +35,7 @@ impl Downloader {
                 Some(
                     Downloader{
                         file_name: file_os_file_name.clone(),
-                        file: Downloader::open_file(file_os_file_name.clone()).await,
+                        file: Downloader::open_file(file_os_file_name.clone(),false).await.map_or(None, |v|Some(v)),
                         batch_size: 1024000,
                         url
                     }
@@ -37,13 +45,23 @@ impl Downloader {
         }
         
     }
-    pub async fn open_file(path:String) ->Arc<Mutex<File>> {
+    pub async fn open_file(path:String,overwrite:bool) ->Result<Arc<Mutex<File>>,Error> {
         let mut op = OpenOptions::new();
-        let file = Arc::new(Mutex::new(op.read(true)
+        let _file = op.read(true)
             .write(true)
-            .create_new(true)
-            .open(path.clone()).await.unwrap()));
-        file
+            .create_new(!overwrite)
+            .open(path.clone())
+            .await;
+        match _file {
+            Ok(f) => {
+                let file = Arc::new(Mutex::new(f));
+                return Ok(file);
+            },
+            Err(e) => {
+                println!("{}",e);
+                Err(e)
+            },
+        }
     }
     pub async fn get_range(url:String) -> Option<u64>{
         let client = reqwest::Client::new();
@@ -103,7 +121,9 @@ impl Downloader {
         file_p.write_all(&byte_data).await.expect("Unable to write data");
     }
     pub async fn download(&mut self){
-        
+        if self.file.is_none(){
+            return;
+        }
         let range_check = Downloader::get_range(self.url.to_string()).await;
         let mut futs = FuturesUnordered::new();
         let mut index = 0;
@@ -118,7 +138,7 @@ impl Downloader {
                             u,
                             index*download_batch_size, 
                             std::cmp::min((index+1) * download_batch_size,max_size),
-                            f
+                            f.unwrap()
                         ).await;
                 });
                 futs.push(task); 
