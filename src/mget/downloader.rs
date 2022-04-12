@@ -3,11 +3,11 @@ use bytes::Bytes;
 use reqwest::{Method, Url};
 use tokio::{fs::{File, OpenOptions}, io::{AsyncSeekExt, AsyncWriteExt}, sync::Mutex};
 use futures::{self, stream::FuturesUnordered, StreamExt};
+
+use super::DownloadOptions;
 pub struct Downloader{
-    file_name:String,
-    file: Option<Arc<Mutex<File>>>,
-    url: String,
-    batch_size : u64,
+    pub file: Option<Arc<Mutex<File>>>,
+    options: Option<DownloadOptions>
 }
 
 fn read_line() -> String{
@@ -17,41 +17,53 @@ fn read_line() -> String{
 }
 
 impl Downloader {
-    
-    pub async fn file(&mut self, file_path:String){
-        self.file_name = file_path.clone();
-        self.file = Downloader::open_file(file_path.clone(),false).await.map_or(None, |v|Some(v))
+
+    // pub async fn file(&mut self, file_path:String){
+    //     self.file = self.open_file(file_path.clone()).await.map_or(None, |v|Some(v))
+    // }
+    pub fn options(&mut self,op:DownloadOptions){
+        self.options = Some(op);
     }
-    pub fn batch_size(&mut self, batch_size:u64){
-        self.batch_size = batch_size;
-    }
-    pub async fn new(url:String) -> Option<Downloader>{
-        let u = Url::parse(&url);
-        match u {
-            Ok(url_item) => {
-                let file_path = url_item.path().to_string(); 
-                let file_path:Vec<&str> = file_path.split("/").collect();
-                let file_os_file_name: String = file_path.last().unwrap().to_string();
-                Some(
-                    Downloader{
-                        file_name: file_os_file_name.clone(),
-                        file: Downloader::open_file(file_os_file_name.clone(),false).await.map_or(None, |v|Some(v)),
-                        batch_size: 1024000,
-                        url
-                    }
-                )
-            },
-            Err(_) => None,
+    pub fn new() -> Downloader{
+        // let u = Url::parse(&url);
+        // match u {
+        //     Ok(url_item) => {
+        //         let file_path = url_item.path().to_string(); 
+        //         let file_path:Vec<&str> = file_path.split("/").collect();
+        //         let file_os_file_name: String = file_path.last().unwrap().to_string();
+        //         Some(
+        //             Downloader{
+        //                 file_name: file_os_file_name.clone(),
+        //                 file: Downloader::open_file(file_os_file_name.clone().await.map_or(None, |v|Some(v)),
+        //                 url,
+        //                 options: DownloadOptions::new()
+        //             }
+        //         )
+        //     },
+        //     Err(_) => None,
+        // }
+        Downloader{
+            file: None,
+            options: None,
         }
-        
     }
-    pub async fn open_file(path:String,overwrite:bool) ->Result<Arc<Mutex<File>>,Error> {
+    pub async fn open_file(path:String) ->Result<Arc<Mutex<File>>,Error> {
         let mut op = OpenOptions::new();
-        let _file = op.read(true)
+        let _file ;
+        // if self.options.over_write {
+            _file = op.read(true)
             .write(true)
-            .create_new(!overwrite)
+            .truncate(true)
+            .create(true)
             .open(path.clone())
             .await;
+        // }else{
+        //     _file = op.read(true)
+        //     .write(true)
+        //     .create_new(true)
+        //     .open(path.clone())
+        //     .await;
+        // }
         match _file {
             Ok(f) => {
                 let file = Arc::new(Mutex::new(f));
@@ -121,18 +133,19 @@ impl Downloader {
         file_p.write_all(&byte_data).await.expect("Unable to write data");
     }
     pub async fn download(&mut self){
-        if self.file.is_none(){
+        if self.options.is_none(){
             return;
         }
-        let range_check = Downloader::get_range(self.url.to_string()).await;
+        let op: DownloadOptions = self.options.clone().unwrap();
+        let range_check = Downloader::get_range(op.download_url.clone()).await;
         let mut futs = FuturesUnordered::new();
         let mut index = 0;
         if range_check.is_some() {
             let max_size = range_check.unwrap();
-            while index * self.batch_size < max_size {
+            while index * op.batch_size < max_size {
                 let f = self.file.clone();
-                let u = self.url.clone();
-                let download_batch_size = self.batch_size.clone();
+                let u: String = op.download_url.clone();
+                let download_batch_size = op.batch_size.clone();
                 let task = tokio::spawn(async move {
                         Downloader::download_byte(
                             u,

@@ -1,4 +1,4 @@
-use mget::mget::downloader::Downloader;
+use mget::mget::{downloader::Downloader, DownloadOptions};
 use clap::Parser;
 #[derive(Parser, Debug)]
 ///A Mutil thread download tool 
@@ -11,25 +11,24 @@ pub struct Args{
     file_name: Option<String>,
     /// Data unit: byte
     #[clap(short, long, default_value_t=1024*1024)]
-    batch_size: u64
+    batch_size: u64,
+    #[clap(short, long)]
+    overwrite: bool
 
 }
 
 pub async fn do_download(args:Args){
     let u:String = args.url;
-    let down = Downloader::new(u).await;
-
-    match down {
+    let d = DownloadOptions::new()
+        .batch_size(args.batch_size)
+        .url(u)
+        .build().await;
+    match d{
         Some(mut downloader) => {
-            if args.file_name.is_some(){
-                downloader.file(args.file_name.unwrap()).await;
-            }
-            downloader.batch_size(args.batch_size);
             downloader.download().await;
-
         },
         None => {
-
+            
         },
     }
 }
@@ -43,7 +42,8 @@ async fn main_test(){
     let args = Args{ 
         url: "https://mirrors.aliyun.com/debian-cd/current/amd64/log/20220326/B_amd64_dvd.log".to_string(), 
         file_name: None, 
-        batch_size: 1024*100
+        batch_size: 1024*100,
+        overwrite: true
      };
     do_download(args).await;
 }
