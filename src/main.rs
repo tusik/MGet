@@ -1,4 +1,4 @@
-use mget::mget::{downloader::Downloader, DownloadOptions};
+use mget::mget::DownloadOptions;
 use clap::Parser;
 #[derive(Parser, Debug)]
 ///A Mutil thread download tool 
@@ -28,7 +28,7 @@ pub async fn do_download(args:Args){
             downloader.download().await;
         },
         None => {
-            
+
         },
     }
 }
@@ -43,7 +43,7 @@ async fn main_test(){
         url: "https://mirrors.aliyun.com/debian-cd/current/amd64/log/20220326/B_amd64_dvd.log".to_string(), 
         file_name: None, 
         batch_size: 1024*100,
-        overwrite: true
+        overwrite: false
      };
     do_download(args).await;
 }

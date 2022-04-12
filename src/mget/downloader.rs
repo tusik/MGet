@@ -1,6 +1,6 @@
-use std::{sync::Arc, io::{SeekFrom, Read, Error, self}};
+use std::{sync::Arc, io::{SeekFrom, Read, Error}};
 use bytes::Bytes;
-use reqwest::{Method, Url};
+use reqwest::Method;
 use tokio::{fs::{File, OpenOptions}, io::{AsyncSeekExt, AsyncWriteExt}, sync::Mutex};
 use futures::{self, stream::FuturesUnordered, StreamExt};
 
@@ -10,17 +10,9 @@ pub struct Downloader{
     options: Option<DownloadOptions>
 }
 
-fn read_line() -> String{
-    let mut s = String::new();
-    io::stdin().read_line(&mut s).expect("Failed to parse int. Please only enter digits.");
-    s
-}
 
 impl Downloader {
 
-    // pub async fn file(&mut self, file_path:String){
-    //     self.file = self.open_file(file_path.clone()).await.map_or(None, |v|Some(v))
-    // }
     pub fn options(&mut self,op:DownloadOptions){
         self.options = Some(op);
     }
@@ -47,23 +39,23 @@ impl Downloader {
             options: None,
         }
     }
-    pub async fn open_file(path:String) ->Result<Arc<Mutex<File>>,Error> {
+    pub async fn open_file(path:String,overwrite:bool) ->Result<Arc<Mutex<File>>,Error> {
         let mut op = OpenOptions::new();
         let _file ;
-        // if self.options.over_write {
+        if overwrite {
             _file = op.read(true)
             .write(true)
             .truncate(true)
             .create(true)
             .open(path.clone())
             .await;
-        // }else{
-        //     _file = op.read(true)
-        //     .write(true)
-        //     .create_new(true)
-        //     .open(path.clone())
-        //     .await;
-        // }
+        }else{
+            _file = op.read(true)
+            .write(true)
+            .create_new(true)
+            .open(path.clone())
+            .await;
+        }
         match _file {
             Ok(f) => {
                 let file = Arc::new(Mutex::new(f));
@@ -133,7 +125,8 @@ impl Downloader {
         file_p.write_all(&byte_data).await.expect("Unable to write data");
     }
     pub async fn download(&mut self){
-        if self.options.is_none(){
+        if self.options.is_none()
+            ||self.file.is_none(){
             return;
         }
         let op: DownloadOptions = self.options.clone().unwrap();

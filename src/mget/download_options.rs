@@ -38,10 +38,10 @@ impl DownloadOptions {
             let file_path = self.download_url.clone(); 
             let file_path:Vec<&str> = file_path.split("/").collect();
             let file_os_file_name: String = file_path.last().unwrap().to_string();
-            d.file = Downloader::open_file(file_os_file_name).await.map_or(None, |v|Some(v));
+            d.file = Downloader::open_file(file_os_file_name,self.over_write).await.map_or(None, |v|Some(v));
 
         }else{
-            d.file = Downloader::open_file(self.write_file_name.clone()).await.map_or(None, |v|Some(v));
+            d.file = Downloader::open_file(self.write_file_name.clone(),self.over_write).await.map_or(None, |v|Some(v));
         }
         Some(d)
     }
