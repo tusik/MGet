@@ -5,13 +5,16 @@ use clap::Parser;
 ///https://github.com/tusik/MGet
 #[clap(author, version, about, long_about = None)]
 pub struct Args{
+    /// Download url
     #[clap(short, long)]
     url: String,
+    /// Local storage file name, keep empty to use uri as file name
     #[clap(short, long)]
     file_name: Option<String>,
     /// Data unit: byte
     #[clap(short, long, default_value_t=1024*1024)]
     batch_size: u64,
+    /// Overwrite local file
     #[clap(short, long)]
     overwrite: bool
 
