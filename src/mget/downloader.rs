@@ -1,7 +1,8 @@
 use std::{sync::Arc, io::{SeekFrom, Read, Error}};
 use bytes::Bytes;
+use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Method;
-use tokio::{fs::{File, OpenOptions}, io::{AsyncSeekExt, AsyncWriteExt}, sync::Mutex};
+use tokio::{fs::{File, OpenOptions}, io::{AsyncSeekExt, AsyncWriteExt}, sync::{Mutex, Semaphore}};
 use futures::{self, stream::FuturesUnordered, StreamExt};
 
 use super::DownloadOptions;
@@ -17,23 +18,7 @@ impl Downloader {
         self.options = Some(op);
     }
     pub fn new() -> Downloader{
-        // let u = Url::parse(&url);
-        // match u {
-        //     Ok(url_item) => {
-        //         let file_path = url_item.path().to_string(); 
-        //         let file_path:Vec<&str> = file_path.split("/").collect();
-        //         let file_os_file_name: String = file_path.last().unwrap().to_string();
-        //         Some(
-        //             Downloader{
-        //                 file_name: file_os_file_name.clone(),
-        //                 file: Downloader::open_file(file_os_file_name.clone().await.map_or(None, |v|Some(v)),
-        //                 url,
-        //                 options: DownloadOptions::new()
-        //             }
-        //         )
-        //     },
-        //     Err(_) => None,
-        // }
+
         Downloader{
             file: None,
             options: None,
@@ -97,7 +82,7 @@ impl Downloader {
             },
         }
     }
-    pub async fn download_byte(url:String,start:u64,end:u64,file:Arc<Mutex<File>>)->Option<Bytes>{
+    pub async fn download_byte(url:String,start:u64,end:u64,file:Arc<Mutex<File>>)->Option<u64>{
         let client = reqwest::Client::new();
         let resp = client.get(url)
             .header("Range", format!("bytes={}-{}",start,end))
@@ -107,9 +92,8 @@ impl Downloader {
         match resp {
             Ok(response) => {
                 let data = response.bytes().await.ok().unwrap();
-                println!("{}-{}",start,end);
                 Downloader::write_to_file(file, start, &data).await;
-                Some(data)
+                Some(data.len().try_into().unwrap())
             },
             Err(e) => {
                 print!("{}",e);
@@ -120,9 +104,14 @@ impl Downloader {
     pub async fn write_to_file(file:Arc<Mutex<File>>,start:u64,data:&Bytes){
         let mut file_p = file.lock().await;
         file_p.seek(SeekFrom::Start(start as u64)).await.unwrap();
+
         let byte_data: Result<Vec<_>, _> = data.bytes().collect();
         let byte_data = byte_data.expect("Unable to read data");
-        file_p.write_all(&byte_data).await.expect("Unable to write data");
+
+        file_p.write(&byte_data).await.expect("Unable to write data");
+
+        // file_p.write_all(&byte_data).await.expect("Unable to write data");
+
     }
     pub async fn download(&mut self){
         if self.options.is_none()
@@ -133,29 +122,40 @@ impl Downloader {
         let range_check = Downloader::get_range(op.download_url.clone()).await;
         let mut futs = FuturesUnordered::new();
         let mut index = 0;
+        let sty = ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .progress_chars("#>-");
+        let pb = ProgressBar::new(range_check.unwrap());
+        pb.set_style(sty.clone());
         if range_check.is_some() {
+            let sem = Arc::new(Semaphore::new(5));
             let max_size = range_check.unwrap();
             while index * op.batch_size < max_size {
+                let permit = Arc::clone(&sem).acquire_owned().await;
                 let f = self.file.clone();
                 let u: String = op.download_url.clone();
                 let download_batch_size = op.batch_size.clone();
+                pb.set_position(index * op.batch_size);
                 let task = tokio::spawn(async move {
-                        Downloader::download_byte(
-                            u,
-                            index*download_batch_size, 
-                            std::cmp::min((index+1) * download_batch_size,max_size),
-                            f.unwrap()
-                        ).await;
+                    let _permit = permit;
+                    Downloader::download_byte(
+                        u,
+                        index*download_batch_size, 
+                        std::cmp::min((index+1) * download_batch_size,max_size),
+                        f.unwrap()
+                    ).await;
                 });
                 futs.push(task); 
-                if futs.len() == 3 {
+                // if futs.len() == 1 {
                     futs.next().await;
-                }
+                // }
                 index+=1;
             }
+            // let handle_m = tokio::task::spawn_blocking(move || m.join().unwrap());
             while let Some(_) = futs.next().await {
                 // outputs.push(item);
             }
+            pb.finish();
                         
         }else{
             

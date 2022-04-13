@@ -50,3 +50,13 @@ async fn main_test(){
      };
     do_download(args).await;
 }
+#[tokio::test]
+async fn large_test(){
+    let args = Args{ 
+        url: "https://mirrors.aliyun.com/debian-cd/current/amd64/iso-cd/debian-11.3.0-amd64-netinst.iso".to_string(), 
+        file_name: None, 
+        batch_size: 50*1024*1024,
+        overwrite: true
+     };
+    do_download(args).await;
+}
