@@ -25,6 +25,7 @@ pub async fn do_download(args:Args){
     let d = DownloadOptions::new()
         .batch_size(args.batch_size)
         .url(u)
+        .overwrite(args.overwrite)
         .build().await;
     match d{
         Some(mut downloader) => {
@@ -46,7 +47,7 @@ async fn main_test(){
         url: "https://mirrors.aliyun.com/debian-cd/current/amd64/log/20220326/B_amd64_dvd.log".to_string(), 
         file_name: None, 
         batch_size: 1024*100,
-        overwrite: false
+        overwrite: true
      };
     do_download(args).await;
 }
