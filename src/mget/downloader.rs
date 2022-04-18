@@ -11,7 +11,6 @@ pub struct Downloader{
     options: Option<DownloadOptions>
 }
 
-
 impl Downloader {
 
     pub fn options(&mut self,op:DownloadOptions){
@@ -24,7 +23,7 @@ impl Downloader {
             options: None,
         }
     }
-    pub async fn open_file(path:String,overwrite:bool) ->Result<Arc<Mutex<File>>,Error> {
+    pub async fn open_file(path: String, file_size: usize, overwrite: bool) ->Result<Arc<Mutex<File>>,Error> {
         let mut op = OpenOptions::new();
         let _file ;
         if overwrite {
@@ -43,8 +42,19 @@ impl Downloader {
         }
         match _file {
             Ok(f) => {
-                let file = Arc::new(Mutex::new(f));
-                return Ok(file);
+                let re_size = f.set_len(file_size as u64).await;
+                match re_size {
+                    Ok(_) => {
+                        let file = Arc::new(Mutex::new(f));
+                        return Ok(file);
+                    },
+                    Err(e) => {
+                        println!("{}",e);
+                        Err(e)
+                    }
+                }
+                
+                
             },
             Err(e) => {
                 println!("{}",e);
@@ -103,12 +113,12 @@ impl Downloader {
     }
     pub async fn write_to_file(file:Arc<Mutex<File>>,start:u64,data:&Bytes){
         let mut file_p = file.lock().await;
-        file_p.seek(SeekFrom::Start(start as u64)).await.unwrap();
+        file_p.seek(SeekFrom::Start(start)).await.unwrap();
 
-        let byte_data: Result<Vec<_>, _> = data.bytes().collect();
-        let byte_data = byte_data.expect("Unable to read data");
+        // let byte_data: Result<Vec<_>, _> = data.bytes().collect();
+        // let byte_data = byte_data.expect("Unable to read data");
 
-        file_p.write(&byte_data).await.expect("Unable to write data");
+        file_p.write(data).await.expect("Unable to write data");
 
         // file_p.write_all(&byte_data).await.expect("Unable to write data");
 
@@ -146,9 +156,9 @@ impl Downloader {
                     ).await;
                 });
                 futs.push(task); 
-                // if futs.len() == 1 {
+                if futs.len() == self.options.as_ref().unwrap().download_threads {
                     futs.next().await;
-                // }
+                }
                 index+=1;
             }
             // let handle_m = tokio::task::spawn_blocking(move || m.join().unwrap());
