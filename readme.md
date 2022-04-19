@@ -1,6 +1,7 @@
 # MGet
 A async way download tools.
 
+![image](example/downloadview.webp)
 # Build
 ```shell
 cargo build --release

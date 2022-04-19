@@ -1,4 +1,4 @@
-use std::{sync::Arc, io::{SeekFrom, Read, Error}};
+use std::{sync::Arc, io::{SeekFrom, Error}};
 use bytes::Bytes;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Method;
@@ -11,12 +11,12 @@ pub struct Downloader{
     options: Option<DownloadOptions>
 }
 
-
 impl Downloader {
 
     pub fn options(&mut self,op:DownloadOptions){
         self.options = Some(op);
     }
+
     pub fn new() -> Downloader{
 
         Downloader{
@@ -24,7 +24,8 @@ impl Downloader {
             options: None,
         }
     }
-    pub async fn open_file(path:String,overwrite:bool) ->Result<Arc<Mutex<File>>,Error> {
+
+    pub async fn open_file(path: String, file_size: usize, overwrite: bool) ->Result<Arc<Mutex<File>>,Error> {
         let mut op = OpenOptions::new();
         let _file ;
         if overwrite {
@@ -43,8 +44,18 @@ impl Downloader {
         }
         match _file {
             Ok(f) => {
-                let file = Arc::new(Mutex::new(f));
-                return Ok(file);
+                let re_size = f.set_len(file_size as u64).await;
+                match re_size {
+                    Ok(_) => {
+                        let file = Arc::new(Mutex::new(f));
+                        return Ok(file);
+                    },
+                    Err(e) => {
+                        println!("{}",e);
+                        Err(e)
+                    }
+                }
+                
             },
             Err(e) => {
                 println!("{}",e);
@@ -52,6 +63,7 @@ impl Downloader {
             },
         }
     }
+
     pub async fn get_range(url:String) -> Option<u64>{
         let client = reqwest::Client::new();
         
@@ -82,6 +94,7 @@ impl Downloader {
             },
         }
     }
+
     pub async fn download_byte(url:String,start:u64,end:u64,file:Arc<Mutex<File>>)->Option<u64>{
         let client = reqwest::Client::new();
         let resp = client.get(url)
@@ -91,9 +104,11 @@ impl Downloader {
         
         match resp {
             Ok(response) => {
-                let data = response.bytes().await.ok().unwrap();
-                Downloader::write_to_file(file, start, &data).await;
-                Some(data.len().try_into().unwrap())
+                // TODO: error handler
+                let data = &response.bytes().await.unwrap();
+
+                Downloader::write_to_file(file, start, data).await;
+                Some(1)
             },
             Err(e) => {
                 print!("{}",e);
@@ -101,18 +116,16 @@ impl Downloader {
             },
         }
     }
+
     pub async fn write_to_file(file:Arc<Mutex<File>>,start:u64,data:&Bytes){
         let mut file_p = file.lock().await;
-        file_p.seek(SeekFrom::Start(start as u64)).await.unwrap();
+        let _seek_pos = file_p.seek(SeekFrom::Start(start)).await.unwrap();
 
-        let byte_data: Result<Vec<_>, _> = data.bytes().collect();
-        let byte_data = byte_data.expect("Unable to read data");
-
-        file_p.write(&byte_data).await.expect("Unable to write data");
+        file_p.write_all(data).await.expect("Unable to write data");
 
         // file_p.write_all(&byte_data).await.expect("Unable to write data");
-
     }
+
     pub async fn download(&mut self){
         if self.options.is_none()
             ||self.file.is_none(){
@@ -132,23 +145,27 @@ impl Downloader {
             let max_size = range_check.unwrap();
             while index * op.batch_size < max_size {
                 let permit = Arc::clone(&sem).acquire_owned().await;
-                let f = self.file.clone();
+                let f = self.file.as_ref().unwrap().clone();
                 let u: String = op.download_url.clone();
                 let download_batch_size = op.batch_size.clone();
                 pb.set_position(index * op.batch_size);
                 let task = tokio::spawn(async move {
                     let _permit = permit;
+                    let mut start = index*download_batch_size;
+                    if index > 0 {
+                        start += 1;
+                    }
                     Downloader::download_byte(
                         u,
-                        index*download_batch_size, 
+                        start, 
                         std::cmp::min((index+1) * download_batch_size,max_size),
-                        f.unwrap()
+                        f
                     ).await;
                 });
                 futs.push(task); 
-                // if futs.len() == 1 {
+                if futs.len() == self.options.as_ref().unwrap().download_threads {
                     futs.next().await;
-                // }
+                }
                 index+=1;
             }
             // let handle_m = tokio::task::spawn_blocking(move || m.join().unwrap());
@@ -160,7 +177,6 @@ impl Downloader {
         }else{
             
         }
-
         
     }
    

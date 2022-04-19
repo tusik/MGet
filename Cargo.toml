@@ -1,6 +1,6 @@
 [package]
 name = "mget"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 repository = "https://github.com/tusik/MGet"
 authors = ["Image <image@by.cx>"]
@@ -14,3 +14,5 @@ bytes = { version = "1", features = ["serde"] }
 indicatif = "0.16.2"
 futures = "0.3"
 url = "2.2.2"
+num_cpus = "1.13.1"
+regex = "1.5.5"
