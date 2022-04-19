@@ -54,7 +54,6 @@ impl Downloader {
                     }
                 }
                 
-                
             },
             Err(e) => {
                 println!("{}",e);
@@ -113,12 +112,13 @@ impl Downloader {
     }
     pub async fn write_to_file(file:Arc<Mutex<File>>,start:u64,data:&Bytes){
         let mut file_p = file.lock().await;
-        file_p.seek(SeekFrom::Start(start)).await.unwrap();
+        let seek_pos = file_p.seek(SeekFrom::Start(start)).await.unwrap();
+        // println!("{},{}",seek_pos,data.len());
 
-        // let byte_data: Result<Vec<_>, _> = data.bytes().collect();
-        // let byte_data = byte_data.expect("Unable to read data");
+        let byte_data: Result<Vec<_>, _> = data.bytes().collect();
+        let byte_data = byte_data.expect("Unable to read data");
 
-        file_p.write(data).await.expect("Unable to write data");
+        file_p.write(&byte_data).await.expect("Unable to write data");
 
         // file_p.write_all(&byte_data).await.expect("Unable to write data");
 
@@ -135,24 +135,28 @@ impl Downloader {
         let sty = ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
             .progress_chars("#>-");
-        let pb = ProgressBar::new(range_check.unwrap());
-        pb.set_style(sty.clone());
+        // let pb = ProgressBar::new(range_check.unwrap());
+        // pb.set_style(sty.clone());
         if range_check.is_some() {
             let sem = Arc::new(Semaphore::new(5));
             let max_size = range_check.unwrap();
             while index * op.batch_size < max_size {
                 let permit = Arc::clone(&sem).acquire_owned().await;
-                let f = self.file.clone();
+                let f = self.file.as_ref().unwrap().clone();
                 let u: String = op.download_url.clone();
                 let download_batch_size = op.batch_size.clone();
-                pb.set_position(index * op.batch_size);
+                // pb.set_position(index * op.batch_size);
                 let task = tokio::spawn(async move {
                     let _permit = permit;
+                    let mut start = index*download_batch_size;
+                    if index > 0 {
+                        start += 1;
+                    }
                     Downloader::download_byte(
                         u,
-                        index*download_batch_size, 
+                        start, 
                         std::cmp::min((index+1) * download_batch_size,max_size),
-                        f.unwrap()
+                        f
                     ).await;
                 });
                 futs.push(task); 
@@ -165,7 +169,7 @@ impl Downloader {
             while let Some(_) = futs.next().await {
                 // outputs.push(item);
             }
-            pb.finish();
+            // pb.finish();
                         
         }else{
             

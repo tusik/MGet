@@ -44,9 +44,9 @@ async fn main() {
 #[tokio::test]
 async fn main_test(){
     let args = Args{ 
-        url: "https://mirrors.aliyun.com/debian-cd/current/amd64/log/20220326/B_amd64_dvd.log".to_string(), 
+        url: "https://mirrors.aliyun.com/ubuntu/pool/main/b/busybox/busybox_1.30.1-6ubuntu3.1.dsc".to_string(), 
         file_name: None, 
-        batch_size: 1024*100,
+        batch_size: 10,
         overwrite: true
      };
     do_download(args).await;
@@ -54,10 +54,10 @@ async fn main_test(){
 #[tokio::test]
 async fn large_test(){
     let args = Args{ 
-        url: "https://mirrors.aliyun.com/debian-cd/current/amd64/iso-cd/debian-11.3.0-amd64-netinst.iso".to_string(), 
+        url: "https://mirrors.aliyun.com/ubuntu/pool/main/b/busybox/busybox_1.27.2.orig.tar.bz2".to_string(), 
         file_name: None, 
-        batch_size: 5*1024*1024,
-        overwrite: true
+        batch_size: 102400,
+        overwrite: false
      };
     do_download(args).await;
 }
