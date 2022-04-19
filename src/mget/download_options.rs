@@ -1,5 +1,3 @@
-use core::num;
-
 use super::Downloader;
 extern crate num_cpus;
 #[derive(Debug, Clone)]

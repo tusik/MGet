@@ -1,4 +1,4 @@
-use std::{sync::Arc, io::{SeekFrom, Read, Error}};
+use std::{sync::Arc, io::{SeekFrom, Error}};
 use bytes::Bytes;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Method;
@@ -16,6 +16,7 @@ impl Downloader {
     pub fn options(&mut self,op:DownloadOptions){
         self.options = Some(op);
     }
+
     pub fn new() -> Downloader{
 
         Downloader{
@@ -23,6 +24,7 @@ impl Downloader {
             options: None,
         }
     }
+
     pub async fn open_file(path: String, file_size: usize, overwrite: bool) ->Result<Arc<Mutex<File>>,Error> {
         let mut op = OpenOptions::new();
         let _file ;
@@ -61,6 +63,7 @@ impl Downloader {
             },
         }
     }
+
     pub async fn get_range(url:String) -> Option<u64>{
         let client = reqwest::Client::new();
         
@@ -91,6 +94,7 @@ impl Downloader {
             },
         }
     }
+
     pub async fn download_byte(url:String,start:u64,end:u64,file:Arc<Mutex<File>>)->Option<u64>{
         let client = reqwest::Client::new();
         let resp = client.get(url)
@@ -100,9 +104,11 @@ impl Downloader {
         
         match resp {
             Ok(response) => {
-                let data = response.bytes().await.ok().unwrap();
-                Downloader::write_to_file(file, start, &data).await;
-                Some(data.len().try_into().unwrap())
+                // TODO: error handler
+                let data = &response.bytes().await.unwrap();
+
+                Downloader::write_to_file(file, start, data).await;
+                Some(1)
             },
             Err(e) => {
                 print!("{}",e);
@@ -110,19 +116,16 @@ impl Downloader {
             },
         }
     }
+
     pub async fn write_to_file(file:Arc<Mutex<File>>,start:u64,data:&Bytes){
         let mut file_p = file.lock().await;
-        let seek_pos = file_p.seek(SeekFrom::Start(start)).await.unwrap();
-        // println!("{},{}",seek_pos,data.len());
+        let _seek_pos = file_p.seek(SeekFrom::Start(start)).await.unwrap();
 
-        let byte_data: Result<Vec<_>, _> = data.bytes().collect();
-        let byte_data = byte_data.expect("Unable to read data");
-
-        file_p.write(&byte_data).await.expect("Unable to write data");
+        file_p.write_all(data).await.expect("Unable to write data");
 
         // file_p.write_all(&byte_data).await.expect("Unable to write data");
-
     }
+
     pub async fn download(&mut self){
         if self.options.is_none()
             ||self.file.is_none(){
@@ -135,8 +138,8 @@ impl Downloader {
         let sty = ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
             .progress_chars("#>-");
-        // let pb = ProgressBar::new(range_check.unwrap());
-        // pb.set_style(sty.clone());
+        let pb = ProgressBar::new(range_check.unwrap());
+        pb.set_style(sty.clone());
         if range_check.is_some() {
             let sem = Arc::new(Semaphore::new(5));
             let max_size = range_check.unwrap();
@@ -145,7 +148,7 @@ impl Downloader {
                 let f = self.file.as_ref().unwrap().clone();
                 let u: String = op.download_url.clone();
                 let download_batch_size = op.batch_size.clone();
-                // pb.set_position(index * op.batch_size);
+                pb.set_position(index * op.batch_size);
                 let task = tokio::spawn(async move {
                     let _permit = permit;
                     let mut start = index*download_batch_size;
@@ -169,12 +172,11 @@ impl Downloader {
             while let Some(_) = futs.next().await {
                 // outputs.push(item);
             }
-            // pb.finish();
+            pb.finish();
                         
         }else{
             
         }
-
         
     }
    
