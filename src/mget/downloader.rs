@@ -2,14 +2,15 @@ use std::{sync::Arc, io::{SeekFrom, Error}};
 use bytes::Bytes;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Method;
-use tokio::{fs::{File, OpenOptions}, io::{AsyncSeekExt, AsyncWriteExt}, sync::{Mutex, Semaphore}};
+use tokio::{fs::{File, OpenOptions}, io::{AsyncSeekExt, AsyncWriteExt}, sync::Mutex};
 use futures::{self, stream::FuturesUnordered, StreamExt};
 
 use super::DownloadOptions;
 pub struct Downloader{
     pub file: Option<Arc<Mutex<File>>>,
-    options: Option<DownloadOptions>
-}
+    options: Option<DownloadOptions>,
+    progress_bar: Option<Arc<Mutex<ProgressBar>>>
+}   
 
 impl Downloader {
 
@@ -22,6 +23,7 @@ impl Downloader {
         Downloader{
             file: None,
             options: None,
+            progress_bar: None
         }
     }
 
@@ -138,19 +140,19 @@ impl Downloader {
         let sty = ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
             .progress_chars("#>-");
+            
         let pb = ProgressBar::new(range_check.unwrap());
         pb.set_style(sty.clone());
+        self.progress_bar = Some(Arc::new(Mutex::new(pb)));
+
         if range_check.is_some() {
-            let sem = Arc::new(Semaphore::new(5));
             let max_size = range_check.unwrap();
             while index * op.batch_size < max_size {
-                let permit = Arc::clone(&sem).acquire_owned().await;
                 let f = self.file.as_ref().unwrap().clone();
                 let u: String = op.download_url.clone();
                 let download_batch_size = op.batch_size.clone();
-                pb.set_position(index * op.batch_size);
+                let _pb = self.progress_bar.as_ref().unwrap().clone();
                 let task = tokio::spawn(async move {
-                    let _permit = permit;
                     let mut start = index*download_batch_size;
                     if index > 0 {
                         start += 1;
@@ -161,6 +163,8 @@ impl Downloader {
                         std::cmp::min((index+1) * download_batch_size,max_size),
                         f
                     ).await;
+                    let _pb = _pb.lock().await;
+                    _pb.set_position(_pb.position()+download_batch_size);
                 });
                 futs.push(task); 
                 if futs.len() == self.options.as_ref().unwrap().download_threads {
@@ -168,11 +172,9 @@ impl Downloader {
                 }
                 index+=1;
             }
-            // let handle_m = tokio::task::spawn_blocking(move || m.join().unwrap());
-            while let Some(_) = futs.next().await {
-                // outputs.push(item);
-            }
-            pb.finish();
+
+            while let Some(_) = futs.next().await {}
+            self.progress_bar.as_ref().unwrap().lock().await.finish();
                         
         }else{
             

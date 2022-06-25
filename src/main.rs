@@ -1,6 +1,5 @@
 use mget::mget::DownloadOptions;
 use clap::Parser;
-use regex::Regex;
 #[derive(Parser, Debug)]
 ///A Mutil thread download tool 
 ///https://github.com/tusik/MGet
@@ -22,8 +21,8 @@ pub struct Args{
 }
 
 fn check_url(s: &str) -> Result<String,String>{
-    let re = Regex::new("(^http://)|(^https://)").unwrap();
-    if re.is_match(s) {
+
+    if s.to_lowercase().find("http://") == Some(0) || s.to_lowercase().find("https://") == Some(0) {
         Ok(s.to_string())
     }else{
         Err("No validate download url provide.".to_string())
