@@ -13,7 +13,7 @@ pub struct Args{
     #[clap(short, long)]
     file_name: Option<String>,
     /// Data unit: byte
-    #[clap(short, long, default_value_t=1024*1024)]
+    #[clap(parse(try_from_str=check_size), short, long)]
     batch_size: u64,
     /// Overwrite local file
     #[clap(short, long)]
@@ -29,6 +29,29 @@ fn check_url(s: &str) -> Result<String,String>{
         Err("No validate download url provide.".to_string())
     }
 }
+
+fn check_size(s: &str) -> Result<u64,String>{
+    let batch_re = Regex::new("^[0-9]+").unwrap();
+    let unit_re = Regex::new("[bkmgt|BKMGT]$").unwrap();
+    let unit = unit_re.find_iter(s).map(
+        |x| x.as_str()
+    ).collect::<Vec<&str>>();
+    let batch = batch_re.find_iter(s).map(|x| x.as_str().parse().unwrap()).collect::<Vec<u64>>();
+    print!("{:?}",batch);
+    if batch.len() == 1 && unit.len() == 1 {
+        Ok(batch[0] * match unit[0] {
+            "b"|"B" => 1,
+            "k"|"K" => 1024,
+            "m"|"M" => 1024 * 1024,
+            "g"|"G" => 1024 * 1024 * 1024,
+            "t"|"T" => 1024 * 1024 * 1024 * 1024,
+            _ => 1
+        })
+    }else{
+        Err("No validate data unit provide.".to_string())
+    }
+}
+
 pub async fn do_download(args:Args){
 
     let u:String = args.url;
@@ -53,6 +76,7 @@ async fn main() {
 }
 #[tokio::test]
 async fn main_test(){
+    check_size("10m");
     let args = Args{ 
         url: "https://mirrors.aliyun.com/ubuntu/pool/main/b/busybox/busybox_1.30.1-6ubuntu3.1.dsc".to_string(), 
         file_name: None, 
