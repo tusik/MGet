@@ -30,22 +30,22 @@ fn check_url(s: &str) -> Result<String,String>{
 }
 
 fn check_size(s: &str) -> Result<u64,String>{
-    let batch_re = Regex::new("^[0-9]+").unwrap();
-    let unit_re = Regex::new("[bkmgt|BKMGT]$").unwrap();
-    let unit = unit_re.find_iter(s).map(
-        |x| x.as_str()
-    ).collect::<Vec<&str>>();
-    let batch = batch_re.find_iter(s).map(|x| x.as_str().parse().unwrap()).collect::<Vec<u64>>();
-    print!("{:?}",batch);
-    if batch.len() == 1 && unit.len() == 1 {
-        Ok(batch[0] * match unit[0] {
-            "b"|"B" => 1,
-            "k"|"K" => 1024,
-            "m"|"M" => 1024 * 1024,
-            "g"|"G" => 1024 * 1024 * 1024,
-            "t"|"T" => 1024 * 1024 * 1024 * 1024,
-            _ => 1
-        })
+    if s.len() >= 2{
+        let unit = s.chars().last().unwrap();
+        let size = s[..s.len()-1].parse::<u64>();
+        match size{
+            Ok(size) => {
+                match unit{
+                    'b' => Ok(size),
+                    'k' => Ok(size*1024),
+                    'm' => Ok(size*1024*1024),
+                    'g' => Ok(size*1024*1024*1024),
+                    _ => Err("No validate data unit provide.".to_string())
+                }
+            },
+            Err(_) => Err("No validate data unit provide.".to_string())
+        }
+            
     }else{
         Err("No validate data unit provide.".to_string())
     }
