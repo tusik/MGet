@@ -11,7 +11,7 @@ pub struct Args{
     /// Local storage file name, keep empty to use uri as file name
     #[clap(short, long)]
     file_name: Option<String>,
-    /// Data unit: byte
+    /// Data unit: b,k,m,g
     #[clap(parse(try_from_str=check_size), short, long)]
     batch_size: u64,
     /// Overwrite local file
@@ -75,7 +75,6 @@ async fn main() {
 }
 #[tokio::test]
 async fn main_test(){
-    check_size("10m");
     let args = Args{ 
         url: "https://mirrors.aliyun.com/ubuntu/pool/main/b/busybox/busybox_1.30.1-6ubuntu3.1.dsc".to_string(), 
         file_name: None, 
