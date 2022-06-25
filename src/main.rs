@@ -11,8 +11,8 @@ pub struct Args{
     /// Local storage file name, keep empty to use uri as file name
     #[clap(short, long)]
     file_name: Option<String>,
-    /// Data unit: byte
-    #[clap(short, long, default_value_t=1024*1024)]
+    /// Data unit: b,k,m,g
+    #[clap(parse(try_from_str=check_size), short, long)]
     batch_size: u64,
     /// Overwrite local file
     #[clap(short, long)]
@@ -28,6 +28,29 @@ fn check_url(s: &str) -> Result<String,String>{
         Err("No validate download url provide.".to_string())
     }
 }
+
+fn check_size(s: &str) -> Result<u64,String>{
+    if s.len() >= 2{
+        let unit = s.chars().last().unwrap();
+        let size = s[..s.len()-1].parse::<u64>();
+        match size{
+            Ok(size) => {
+                match unit{
+                    'b' => Ok(size),
+                    'k' => Ok(size*1024),
+                    'm' => Ok(size*1024*1024),
+                    'g' => Ok(size*1024*1024*1024),
+                    _ => Err("No validate data unit provide.".to_string())
+                }
+            },
+            Err(_) => Err("No validate data unit provide.".to_string())
+        }
+            
+    }else{
+        Err("No validate data unit provide.".to_string())
+    }
+}
+
 pub async fn do_download(args:Args){
 
     let u:String = args.url;

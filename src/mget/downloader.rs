@@ -138,7 +138,7 @@ impl Downloader {
         let mut futs = FuturesUnordered::new();
         let mut index = 0;
         let sty = ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
             .progress_chars("#>-");
             
         let pb = ProgressBar::new(range_check.unwrap());
