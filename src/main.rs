@@ -86,7 +86,7 @@ async fn main_test(){
 #[tokio::test]
 async fn large_test(){
     let args = Args{ 
-        url: "https://mirrors.aliyun.com/debian-cd/current/amd64/iso-cd/debian-11.3.0-amd64-netinst.iso".to_string(), 
+        url: "https://mirrors.aliyun.com/linux-kernel/v5.x/patch-5.9.xz".to_string(), 
         file_name: None, 
         batch_size: 5*1024*1024,
         overwrite: true
