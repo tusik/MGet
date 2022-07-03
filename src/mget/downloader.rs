@@ -98,12 +98,13 @@ impl Downloader {
     }
 
     pub async fn download_byte(url:String,start:u64,end:u64,file:Arc<Mutex<File>>)->Option<u64>{
+        println!("start {}",&start);
         let client = reqwest::Client::new();
         let resp = client.get(url)
             .header("Range", format!("bytes={}-{}",start,end))
             .header("user-agent", "Mget-rs")
             .send().await;
-        
+        println!("start {}",&start);
         match resp {
             Ok(response) => {
                 // TODO: error handler

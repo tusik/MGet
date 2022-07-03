@@ -10,13 +10,15 @@ pub struct DownloadOptions{
 }
 impl DownloadOptions {
     pub fn new()->DownloadOptions{
-        DownloadOptions{ 
+        let d = DownloadOptions{ 
             batch_size: 1024*1024, 
             over_write: false,
             download_url: String::new(),
             write_file_name: String::new(),
             download_threads: num_cpus::get()/2
-        }
+        };
+        
+        return d;
     }
     pub fn batch_size(&mut self,size:u64) -> &mut DownloadOptions{
         self.batch_size = size;
@@ -52,6 +54,7 @@ impl DownloadOptions {
             filename = self.write_file_name.clone();
         }
         let file_size = Downloader::get_range(self.download_url.clone()).await;
+        println!("Start Download {}, {} task",&filename,self.download_threads);
         match file_size {
             Some(size) => {
                 d.file = Downloader::open_file(filename,size as usize,self.over_write).await.map_or(None, |v|Some(v));
